@@ -16,9 +16,12 @@ namespace MVC.Demo
 	[DefaultExecutionOrder(10000)]
 	public class MVCDemo : ToolkitBehaviour
 	{
-		#region Variables
+        #region Variables
 
-		[Tooltip("The UI text to display tutorial")]
+        [Tooltip("The UI text to display tutorial")]
+        public Vehicle myVehicle;
+
+        [Tooltip("The UI text to display tutorial")]
 		public TextMeshProUGUI tutorialText;
 		[Tooltip("Player vehicle index at startup")]
 		public int playerVehicleIndexAtStart;
@@ -34,11 +37,11 @@ namespace MVC.Demo
 		// Current player vehicle index
 		private int playerVehicleIndex;
 
-		#endregion
+        #endregion
 
-		#region Methods
+        #region Methods
 
-		private void Start()
+        private void Start()
 		{
 			// Disable auto Player vehicle refresh if set to 'true'
 			if (Manager.autoRefreshPlayer)
@@ -155,8 +158,9 @@ namespace MVC.Demo
 				// If 'activeVehicles' is empty, assign a new AI vehicle
 				Manager.PlayerTarget = activeVehicles.Length > 0 ? activeVehicles[playerVehicleIndex] : Manager.AIVehicles[playerVehicleIndex];
 
-				// Refresh the manager current player
-				Manager.RefreshPlayer();
+
+                // Refresh the manager current player
+                Manager.RefreshPlayer();
 
 				// Set the player change flag to 'false' to prevent this if statement from getting executed without any changes happening
 				playerChanged = false;

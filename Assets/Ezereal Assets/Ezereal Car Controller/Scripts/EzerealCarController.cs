@@ -165,6 +165,16 @@ namespace Ezereal
             //Debug.Log("Acceleration: " + currentAccelerationValue.ToString());
         }
 
+        public void setAcceleration(float num)
+        {
+            currentAccelerationValue = num;
+        }
+
+        public void setSteerAngel(float angel)
+        {
+            currentSteerAngle = angel;
+        }
+
         void Acceleration()
         {
             if (isStarted)

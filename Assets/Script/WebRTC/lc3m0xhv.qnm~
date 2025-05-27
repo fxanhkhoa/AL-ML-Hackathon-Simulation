@@ -1,0 +1,277 @@
+﻿using System.Collections;
+using System.Collections.Generic;
+using Unity.WebRTC;
+using UnityEngine;
+using SocketIOClient;
+using System.Net.Sockets;
+using System;
+using UnityEngine.UI;
+using System.Threading.Tasks;
+
+public class CameraWebRTC : MonoBehaviour
+{
+    [SerializeField] private Camera streamCamera;
+    [SerializeField] private int width = 1280;
+    [SerializeField] private int height = 720;
+    [SerializeField] private int frameRate = 30;
+    [SerializeField] private Button startStreamBtn; 
+
+    private RTCPeerConnection peerConnection;
+    private RTCDataChannel dataChannel;
+    private RenderTexture cameraRenderTexture;
+    private List<RTCRtpSender> rtpSenders = new List<RTCRtpSender>();
+
+    private MediaStream videoStream;
+
+    private SocketIO socket;
+    private bool isConnected = false;
+
+    private void Awake()
+    {
+        // Initialize WebRTC with a specific configuration
+    }
+
+    // Use this for initialization
+    async void Start()
+    {
+        socket = new SocketIO("http://localhost:3000");
+
+        // Set up event handlers
+        socket.OnConnected += Socket_OnConnected;
+        socket.OnDisconnected += Socket_OnDisconnected;
+
+        // Set up a listener for a specific event
+        socket.On("chat message", response => {
+            string message = response.GetValue<string>();
+            Debug.Log($"Received message: {message}");
+
+            // Note: Socket.IO callbacks run on a different thread
+            // Use Unity's main thread if you need to update UI
+        });
+
+        socket.On("answer", response =>
+        {
+            var sdp = response.GetValue<RTCSessionDescription>();
+            peerConnection.SetRemoteDescription(ref sdp);
+        });
+
+        socket.On("candidate", response =>
+        {
+            if (peerConnection != null)
+            {
+                peerConnection.AddIceCandidate(new RTCIceCandidate(response.GetValue<RTCIceCandidateInit>()));
+            }
+        });
+
+        try
+        {
+            await socket.ConnectAsync();
+            await socket.EmitAsync("join", "AI");
+
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"Connection error: {e.Message}");
+        }
+    }
+
+    public void startStreamingClick()
+    {
+        Debug.Log("Start streaming");
+        StartCoroutine(WebRTCCoroutine());
+    }
+
+    // Update is called once per frame
+    void Update()
+    {
+
+    }
+
+    private IEnumerator WebRTCCoroutine()
+    {
+        // Create render texture for the camera
+        cameraRenderTexture = new RenderTexture(width, height, 0, RenderTextureFormat.BGRA32);
+        cameraRenderTexture.Create();
+        streamCamera.targetTexture = cameraRenderTexture;
+
+        // Create media stream
+        videoStream = new MediaStream();
+
+        videoStream = streamCamera.CaptureStream(width, height);
+        Debug.Log("Media stream created");
+
+        VideoStreamTrack videoTrack = new VideoStreamTrack(cameraRenderTexture);
+        videoStream.AddTrack(videoTrack);
+        Debug.Log("Video track added");
+
+        // Create peer connections
+        var configuration = new RTCConfiguration
+        {
+            iceServers = new[] { new RTCIceServer { urls = new[] { "stun:stun.l.google.com:19302" } } }
+        };
+
+        peerConnection = new RTCPeerConnection(ref configuration);
+        Debug.Log("Peer connection created");
+
+        // Add tracks to local peer connection
+        foreach (var track in videoStream.GetTracks())
+        {
+            rtpSenders.Add(peerConnection.AddTrack(track, videoStream));
+            Debug.Log("Track added");
+        }
+
+        // Set up event handlers
+        peerConnection.OnIceCandidate = candidate =>
+        {
+            // Emit candidate Here
+            if (candidate != null)
+            {
+                Debug.Log("Emitting candidate: " + candidate.ToString());
+                SocketIO_SendObject("candidate", candidate);
+            }
+        };
+
+
+        peerConnection.OnConnectionStateChange = state =>
+        {
+            Debug.Log("Local connection state changed to: " + state);
+        };
+
+        peerConnection.OnDataChannel = channel =>
+        {
+            dataChannel = channel;
+            dataChannel.OnMessage = message =>
+            {
+                Debug.Log("Received message: " + message);
+            };
+        };
+
+
+        StartCoroutine(CreateOffer());
+
+        yield return null;
+    }
+
+    private IEnumerator CreateOffer()
+    {
+        Debug.Log("Creating offer");
+
+        if (peerConnection == null)
+        {
+            Debug.LogError("PeerConnection is null");
+            yield break;
+        }
+
+        // Check if tracks have been added
+        Debug.Log($"Number of senders: {rtpSenders.Count}");
+
+        var offerOp = peerConnection.CreateOffer();
+        yield return offerOp;
+
+        if (offerOp.IsError)
+        {
+            Debug.LogError($"Error creating offer: {offerOp.Error}");
+            yield break;
+        }
+
+        RTCSessionDescription offer = offerOp.Desc;
+
+        var setLocalDescOp = peerConnection.SetLocalDescription(ref offer);
+        yield return setLocalDescOp;
+
+        if (setLocalDescOp.IsError)
+        {
+            Debug.LogError($"Error setting local description: {setLocalDescOp.Error}");
+            yield break;
+        }
+
+        Debug.Log("Offer created: " + offer);
+        SocketIO_SendObject("offer", offer);
+    }
+
+    async private void OnDestroy()  
+    {
+        if (socket != null)
+        {
+            await socket.DisconnectAsync();
+            socket.Dispose();
+        }
+
+        // Clean up
+        foreach (var sender in rtpSenders)
+        {
+            peerConnection.RemoveTrack(sender);
+        }
+
+        if (videoStream != null)
+        {
+            foreach (var track in videoStream.GetTracks())
+            {
+                track.Dispose();
+            }
+            videoStream.Dispose();
+        }
+
+        if (peerConnection != null)
+        {
+            peerConnection.Close();
+            peerConnection.Dispose();
+        }
+
+        if (cameraRenderTexture != null)
+        {
+            if (streamCamera != null)
+                streamCamera.targetTexture = null;
+
+            cameraRenderTexture.Release();
+            Destroy(cameraRenderTexture);
+        }
+
+        // WebRTC.Dispose() is called automatically when exiting the application
+    }
+    private void Socket_OnConnected(object sender, EventArgs e)
+    {
+        isConnected = true;
+        Debug.Log("Connected to server");
+
+        // Send a message after connection
+        SocketIO_SendMessage("welcome", "Hello from Unity!");
+    }
+
+    private void Socket_OnDisconnected(object sender, string e)
+    {
+        isConnected = false;
+        Debug.Log($"Disconnected: {e}");
+    }
+
+    // Method to send a message to the server
+    public async void SocketIO_SendMessage(string topic, string message)
+    {
+        if (!isConnected) return;
+
+        try
+        {
+            await socket.EmitAsync(topic, message);
+            Debug.Log($"Message sent: {message}");
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"Error sending message: {e.Message}");
+        }
+    }
+
+    public async void SocketIO_SendObject(string topic, object obj, string roomID = "AI")
+    {
+        if (!isConnected) return;
+
+        try
+        {
+            await socket.EmitAsync(topic, obj, roomID);
+            Debug.Log($"Message sent: {obj}");
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"Error sending message: {e.Message}");
+        }
+    }
+}

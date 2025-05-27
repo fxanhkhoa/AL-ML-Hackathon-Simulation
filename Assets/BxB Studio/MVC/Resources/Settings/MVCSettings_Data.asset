@@ -123,7 +123,7 @@ MonoBehaviour:
   gamepadRumbleType: 2
   gamepadRumbleMask: 2
   useGamepadLevelledRumble: 1
-  useSeparateGamepadRumbleSides: 1
+  useSeparateGamepadRumbleSides: 0
   steerInput: Steering Wheel
   fuelInput: Fuel Pedal
   brakeInput: Brake Pedal

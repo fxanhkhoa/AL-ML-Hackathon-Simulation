@@ -28,7 +28,7 @@ namespace Ezereal
                     // Only play the sound if cooldown time has passed
                     if (Time.time >= nextPlayTime)
                     {
-                        bumpSound.Play();
+                        //bumpSound.Play();
                         nextPlayTime = Time.time + cooldownTime;
                     }
                 }
