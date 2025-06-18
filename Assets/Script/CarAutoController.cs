@@ -15,6 +15,7 @@ public class CarAutoController : MonoBehaviour
         ezerealCarController.setAcceleration(1f);
         await Task.Delay(TimeSpan.FromSeconds(15));
         ezerealCarController.setAcceleration(0f);
+        ezerealCarController.setSteerAngel(15f);
     }
     
     // Start is called once before the first execution of Update after the MonoBehaviour is created
@@ -28,4 +29,11 @@ public class CarAutoController : MonoBehaviour
     {
         
     }
+}
+
+public class EngineUpdate
+{
+    public float acceleration;
+    public float steerAngle;
+    public float brake;
 }

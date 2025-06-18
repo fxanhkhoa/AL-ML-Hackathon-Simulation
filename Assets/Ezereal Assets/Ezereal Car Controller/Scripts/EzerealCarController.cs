@@ -175,6 +175,11 @@ namespace Ezereal
             currentSteerAngle = angel;
         }
 
+        public void setBrake(float brake)
+        {
+            currentBrakeValue = brake;
+        }
+
         void Acceleration()
         {
             if (isStarted)

@@ -1,4 +1,5 @@
-﻿using SocketIOClient;
+﻿using Ezereal;
+using SocketIOClient;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -18,6 +19,7 @@ namespace Assets.Script.WebRTC
         [SerializeField] private int quality = 75;
         [SerializeField]
         private float sendInterval = 1f;
+        [SerializeField] EzerealCarController ezerealCarController;
 
         private RTCPeerConnection peerConnection;
         private MediaStream mediaStream;
@@ -29,10 +31,16 @@ namespace Assets.Script.WebRTC
         private bool isConnected = false;
 
         // Use this for initialization
+
+        void SetEngine(EngineUpdate engine)
+        {
+            ezerealCarController.setAcceleration(engine.acceleration);
+            ezerealCarController.setSteerAngel(engine.steerAngle);
+            ezerealCarController.setBrake(engine.brake);
+        }
         void Start()
         {
             texture = new Texture2D(imageWidth, imageHeight, TextureFormat.RGB24, false);
-            StartCoroutine(WebRTCInitialize());
         }
 
         // Update is called once per frame
@@ -48,10 +56,9 @@ namespace Assets.Script.WebRTC
         {
             while (true)
             {
-                Debug.Log("SEND IMAGE");
                 if (isConnected)
                 {
-                    Debug.Log("SEND IMAGE 1");
+                    Debug.Log("SEND IMAGE");
                     SendCameraImage();
                 }
                 yield return new WaitForSeconds(sendInterval);
@@ -85,8 +92,15 @@ namespace Assets.Script.WebRTC
             socket.Emit("broadcast_image", base64Image);
         }
 
+        public void startStreaming()
+        {
+            StartCoroutine(WebRTCInitialize());
+        }
+
         IEnumerator WebRTCInitialize()
         {
+            SetupCamera();
+
             // Connect to signaling server
             ConnectToSignalingServer();
 
@@ -99,6 +113,11 @@ namespace Assets.Script.WebRTC
             //SetupCameraStream();
 
             yield return null;
+        }
+
+        private void SetupCamera()
+        {
+            displayImage.texture = streamingCamera.targetTexture;
         }
 
 
@@ -129,6 +148,15 @@ namespace Assets.Script.WebRTC
             {
                 Debug.Log("New watcher connected");
                 StartCoroutine(CreateOffer());
+            }); 
+
+            socket.OnUnityThread("engine_update", response =>
+            {
+                Debug.Log("Received engine update");
+                string message = response.GetValue<string>();
+                Debug.Log(message);
+                var obj = JsonUtility.FromJson<EngineUpdate>(message);
+                SetEngine(obj);
             });
 
             socket.OnUnityThread("answer", response =>
