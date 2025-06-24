@@ -18,7 +18,7 @@ namespace Assets.Script.WebRTC
         [SerializeField] private int imageHeight = 480;
         [SerializeField] private int quality = 75;
         [SerializeField]
-        private float sendInterval = 1f;
+        private float sendInterval = 0.1f;
         [SerializeField] EzerealCarController ezerealCarController;
 
         private RTCPeerConnection peerConnection;
@@ -29,11 +29,23 @@ namespace Assets.Script.WebRTC
 
         private Texture2D texture;
         private bool isConnected = false;
+        public bool isFinished = false;
 
         // Use this for initialization
 
+        public void triggerFinished()
+        {
+            ezerealCarController.setAcceleration(0);
+            ezerealCarController.setSteerAngel(0);
+            ezerealCarController.setBrake(0);
+        }
+
         void SetEngine(EngineUpdate engine)
         {
+            if (isFinished)
+            {
+                return;
+            }
             ezerealCarController.setAcceleration(engine.acceleration);
             ezerealCarController.setSteerAngel(engine.steerAngle);
             ezerealCarController.setBrake(engine.brake);
@@ -46,9 +58,16 @@ namespace Assets.Script.WebRTC
         // Update is called once per frame
         void Update()
         {
-            if (videoStreamTrack != null && streamingCamera != null)
+            if (streamingCamera != null && streamingCamera.targetTexture != null && displayImage != null)
             {
+                // Ensure the camera renders every frame
                 streamingCamera.Render();
+
+                // If using WebRTC, make sure the track is getting updates
+                if (videoStreamTrack != null && !videoStreamTrack.Enabled)
+                {
+                    videoStreamTrack.Enabled = true;
+                }
             }
         }
 
@@ -67,29 +86,36 @@ namespace Assets.Script.WebRTC
 
         private void SendCameraImage()
         {
-            // Create a render texture
-            RenderTexture rt = new RenderTexture(imageWidth, imageHeight, 24);
+            if (streamingCamera == null || streamingCamera.targetTexture == null)
+            {
+                Debug.LogError("Camera or target texture is null");
+                return;
+            }
 
-            // Set the camera's target texture and render
-            streamingCamera.targetTexture = rt;
+            RenderTexture rt = streamingCamera.targetTexture;
+
+            // Render to the texture
             streamingCamera.Render();
 
             // Read pixels from the render texture
             RenderTexture.active = rt;
+            if (texture == null)
+            {
+                texture = new Texture2D(imageWidth, imageHeight, TextureFormat.RGB24, false);
+            }
             texture.ReadPixels(new Rect(0, 0, imageWidth, imageHeight), 0, 0);
             texture.Apply();
-
-            // Reset camera and render texture
-            streamingCamera.targetTexture = null;
             RenderTexture.active = null;
-            Destroy(rt);
 
             // Convert to JPG and send via Socket.IO
             byte[] bytes = texture.EncodeToJPG(quality);
             string base64Image = Convert.ToBase64String(bytes);
 
             // Send the image through Socket.IO
-            socket.Emit("broadcast_image", base64Image);
+            if (socket != null && socket.Connected)
+            {
+                socket.Emit("broadcast_image", base64Image);
+            }
         }
 
         public void startStreaming()
@@ -117,7 +143,21 @@ namespace Assets.Script.WebRTC
 
         private void SetupCamera()
         {
-            displayImage.texture = streamingCamera.targetTexture;
+            // Create a persistent render texture for the camera
+            RenderTexture rt = new RenderTexture(imageWidth, imageHeight, 24);
+            // Assign it to the camera
+            streamingCamera.targetTexture = rt;
+            // Assign it to the display image
+            displayImage.texture = rt;
+
+            // Ensure the display is visible
+            if (displayImage.gameObject.activeSelf == false)
+            {
+                displayImage.gameObject.SetActive(true);
+            }
+
+            // Log to verify setup
+            Debug.Log($"Camera setup complete. Display image texture assigned: {displayImage.texture != null}");
         }
 
 
@@ -342,6 +382,14 @@ namespace Assets.Script.WebRTC
 
             if (socket != null)
                 socket.Disconnect();
+
+            if (streamingCamera != null && streamingCamera.targetTexture != null)
+            {
+                RenderTexture rt = streamingCamera.targetTexture;
+                streamingCamera.targetTexture = null;
+                rt.Release();
+                Destroy(rt);
+            }
         }
     }
 }

@@ -36,6 +36,8 @@ namespace Ezereal
         [SerializeField] TMP_Text currentSpeedTMP_Dashboard;
         [SerializeField] Slider accelerationSlider;
 
+        [SerializeField] TMP_Text currentSteerAngle_UI;
+
         [Header("Settings")]
         public bool isStarted = true;
 
@@ -354,6 +356,7 @@ namespace Ezereal
             float adjustedspeedFactor = Mathf.InverseLerp(20, maxForwardSpeed, currentSpeed); //minimum speed affecting steerAngle is 20
             float adjustedTurnAngle = targetSteerAngle * (1 - adjustedspeedFactor); //based on current speed.
             currentSteerAngle = Mathf.Lerp(currentSteerAngle, adjustedTurnAngle, Time.deltaTime * steeringSpeed);
+            currentSteerAngle_UI.text = currentSteerAngle.ToString("F0") + "°";
 
             frontLeftWheelCollider.steerAngle = currentSteerAngle;
             frontRightWheelCollider.steerAngle = currentSteerAngle;
