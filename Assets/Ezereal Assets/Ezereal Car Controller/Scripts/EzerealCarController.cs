@@ -37,6 +37,7 @@ namespace Ezereal
         [SerializeField] Slider accelerationSlider;
 
         [SerializeField] TMP_Text currentSteerAngle_UI;
+        [SerializeField] TMP_Text currentGear_UI;
 
         [Header("Settings")]
         public bool isStarted = true;
@@ -505,6 +506,7 @@ namespace Ezereal
         {
             currentGearTMP_UI.text = gear;
             currentGearTMP_Dashboard.text = gear;
+            currentGear_UI.text = gear;
         }
 
         void UpdateSpeedText(float speed)
