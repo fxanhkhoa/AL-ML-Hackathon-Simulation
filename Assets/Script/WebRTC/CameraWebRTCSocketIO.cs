@@ -12,8 +12,10 @@ namespace Assets.Script.WebRTC
     public class CameraWebRTCSocketIO : MonoBehaviour
     {
         [SerializeField] private Camera streamingCamera;
+        //[SerializeField] private Camera streamingSignCamera;
         [SerializeField] private string signalServerUrl = "http://localhost:3000";
         [SerializeField] private RawImage displayImage;
+        //[SerializeField] private RawImage displaySignImage;
         [SerializeField] private int imageWidth = 640;
         [SerializeField] private int imageHeight = 480;
         [SerializeField] private int quality = 75;
@@ -53,6 +55,7 @@ namespace Assets.Script.WebRTC
         void Start()
         {
             texture = new Texture2D(imageWidth, imageHeight, TextureFormat.RGB24, false);
+            SetupCamera();
         }
 
         // Update is called once per frame
@@ -125,8 +128,6 @@ namespace Assets.Script.WebRTC
 
         IEnumerator WebRTCInitialize()
         {
-            SetupCamera();
-
             // Connect to signaling server
             ConnectToSignalingServer();
 
@@ -155,6 +156,19 @@ namespace Assets.Script.WebRTC
             {
                 displayImage.gameObject.SetActive(true);
             }
+
+            //// Create a persistent render texture for the camera
+            //RenderTexture rtSign = new RenderTexture(imageWidth, imageHeight, 24);
+            //// Assign it to the camera
+            //streamingSignCamera.targetTexture = rtSign;
+            //// Assign it to the display image
+            //displaySignImage.texture = rtSign;
+
+            //// Ensure the display is visible
+            //if (displaySignImage.gameObject.activeSelf == false)
+            //{
+            //    displaySignImage.gameObject.SetActive(true);
+            //}
 
             // Log to verify setup
             Debug.Log($"Camera setup complete. Display image texture assigned: {displayImage.texture != null}");
